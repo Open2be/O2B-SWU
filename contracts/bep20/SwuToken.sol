@@ -1,97 +1,119 @@
-pragma solidity >=0.6.0;
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
 
 import "./IBEP20.sol";
-import "openzeppelin-solidity/contracts/GSN/Context.sol";
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/proxy/Initializable.sol";
+import "./TokenAccessControl.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-contract BEP20 is Context, IBEP20, Initializable {
+contract SwuToken is Context, IBEP20, TokenAccessControl, Initializable {
     using SafeMath for uint256;
 
-    mapping (address => uint256) internal _balances;
-    mapping (address => mapping (address => uint256)) internal _allowances;
+    mapping(address => uint256) internal _balances;
+    mapping(address => mapping(address => uint256)) internal _allowances;
     uint256 internal _totalSupply;
     string internal _name;
     string internal _symbol;
     uint8 internal _decimals;
 
-    address internal _owner;
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    uint256 public _feePlatformPct;
 
+    address public _platformFeesAddress;
 
-    constructor() public {
-    }
+    event FeesPctUpdated(
+        uint256 indexed feePlatformPct,
+        uint256 oldFeePlatformPct
+    );
+    event PlatformFeesAddressUpdated(
+        address indexed platformFeesAddress,
+        address indexed oldPlatformFeesAddress
+    );
+
+    constructor() {}
 
     /**
-     * @dev Throws if called by any account other than the owner.
+     * @dev sets initials supply and the owner
      */
-    modifier onlyOwner() {
-        require(_owner == _msgSender(), "Ownable: caller is not the owner");
-        _;
+    function initialize(
+        string memory name_,
+        string memory symbol_,
+        uint8 decimals_,
+        uint256 amount,
+        address owner,
+        address whitelister,
+        uint256 feePlatformPct,
+        address platformFeesAddress
+    ) public initializer {
+        initializeRoles(owner, whitelister);
+        _name = name_;
+        _symbol = symbol_;
+        _decimals = decimals_;
+        _feePlatformPct = feePlatformPct;
+        _platformFeesAddress = platformFeesAddress;
+        _mint(owner, amount);
     }
 
-    /**
-    * @dev Leaves the contract without owner. It will not be possible to call
-    * `onlyOwner` functions anymore. Can only be called by the current owner.
-    *
-    * NOTE: Renouncing ownership will leave the contract without an owner,
-    * thereby removing any functionality that is only available to the owner.
-    */
-    function renounceOwnership() public onlyOwner {
-        emit OwnershipTransferred(_owner, address(0));
-        _owner = address(0);
+    function setFees(uint256 feePlatformPct) public onlyRole(OWNER_ROLE) {
+        require(feePlatformPct <= 10000, "Fees must not total more than 100%");
+
+        emit FeesPctUpdated(feePlatformPct, _feePlatformPct);
+        _feePlatformPct = feePlatformPct;
     }
 
-    /**
-     * @dev Transfers ownership of the contract to a new account (`newOwner`).
-     * Can only be called by the current owner.
-     */
-    function transferOwnership(address newOwner) public onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
-        emit OwnershipTransferred(_owner, newOwner);
-        _owner = newOwner;
-    }
-
-
-    /**
-     * @dev Returns the bep token owner.
-     */
-    function getOwner() external override view returns (address) {
-        return _owner;
+    function setPlatformFeesAddress(address platformFeesAddress)
+        public
+        onlyRole(OWNER_ROLE)
+    {
+        require(
+            platformFeesAddress != address(0),
+            "Address must not be zero address"
+        );
+        emit PlatformFeesAddressUpdated(
+            platformFeesAddress,
+            _platformFeesAddress
+        );
+        _platformFeesAddress = platformFeesAddress;
     }
 
     /**
      * @dev Returns the token decimals.
      */
-    function decimals() external override view returns (uint8) {
+    function decimals() external view override returns (uint8) {
         return _decimals;
     }
 
     /**
      * @dev Returns the token symbol.
      */
-    function symbol() external override view returns (string memory) {
+    function symbol() external view override returns (string memory) {
         return _symbol;
     }
 
     /**
-    * @dev Returns the token name.
-    */
-    function name() external override view returns (string memory) {
+     * @dev Returns the token name.
+     */
+    function name() external view override returns (string memory) {
         return _name;
     }
 
     /**
      * @dev See {BEP20-totalSupply}.
      */
-    function totalSupply() external override view returns (uint256) {
+    function totalSupply() external view override returns (uint256) {
         return _totalSupply;
     }
 
     /**
      * @dev See {BEP20-balanceOf}.
      */
-    function balanceOf(address account) external override view returns (uint256) {
+    function balanceOf(address account)
+        external
+        view
+        override
+        returns (uint256)
+    {
         return _balances[account];
     }
 
@@ -103,7 +125,11 @@ contract BEP20 is Context, IBEP20, Initializable {
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address recipient, uint256 amount) external override returns (bool) {
+    function transfer(address recipient, uint256 amount)
+        external
+        override
+        returns (bool)
+    {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -111,7 +137,12 @@ contract BEP20 is Context, IBEP20, Initializable {
     /**
      * @dev See {BEP20-allowance}.
      */
-    function allowance(address owner, address spender) external override view returns (uint256) {
+    function allowance(address owner, address spender)
+        external
+        view
+        override
+        returns (uint256)
+    {
         return _allowances[owner][spender];
     }
 
@@ -122,7 +153,11 @@ contract BEP20 is Context, IBEP20, Initializable {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount) external override returns (bool) {
+    function approve(address spender, uint256 amount)
+        external
+        override
+        returns (bool)
+    {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -139,9 +174,20 @@ contract BEP20 is Context, IBEP20, Initializable {
      * - the caller must have allowance for `sender`'s tokens of at least
      * `amount`.
      */
-    function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external override returns (bool) {
         _transfer(sender, recipient, amount);
-        _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "BEP20: transfer amount exceeds allowance"));
+        _approve(
+            sender,
+            _msgSender(),
+            _allowances[sender][_msgSender()].sub(
+                amount,
+                "BEP20: transfer amount exceeds allowance"
+            )
+        );
         return true;
     }
 
@@ -157,8 +203,15 @@ contract BEP20 is Context, IBEP20, Initializable {
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
+    function increaseAllowance(address spender, uint256 addedValue)
+        public
+        returns (bool)
+    {
+        _approve(
+            _msgSender(),
+            spender,
+            _allowances[_msgSender()][spender].add(addedValue)
+        );
         return true;
     }
 
@@ -176,20 +229,32 @@ contract BEP20 is Context, IBEP20, Initializable {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "BEP20: decreased allowance below zero"));
+    function decreaseAllowance(address spender, uint256 subtractedValue)
+        public
+        returns (bool)
+    {
+        _approve(
+            _msgSender(),
+            spender,
+            _allowances[_msgSender()][spender].sub(
+                subtractedValue,
+                "BEP20: decreased allowance below zero"
+            )
+        );
         return true;
     }
 
     /**
-   * @dev Burn `amount` tokens and decreasing the total supply.
-   */
+     * @dev Burn `amount` tokens and decreasing the total supply.
+     */
     function burn(uint256 amount) public returns (bool) {
         _burn(_msgSender(), amount);
         return true;
     }
 
     /**
+     * @notice if `sender` or `recipient` is not whitelisted
+     *  then platform fees will be deducted from the amount to be transferred
      * @dev Moves tokens `amount` from `sender` to `recipient`.
      *
      * This is internal function is equivalent to {transfer}, and can be used to
@@ -203,11 +268,36 @@ contract BEP20 is Context, IBEP20, Initializable {
      * - `recipient` cannot be the zero address.
      * - `sender` must have a balance of at least `amount`.
      */
-    function _transfer(address sender, address recipient, uint256 amount) virtual internal {
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal {
         require(sender != address(0), "BEP20: transfer from the zero address");
         require(recipient != address(0), "BEP20: transfer to the zero address");
 
-        _balances[sender] = _balances[sender].sub(amount, "BEP20: transfer amount exceeds balance");
+        _balances[sender] = _balances[sender].sub(
+            amount,
+            "BEP20: transfer amount exceeds balance"
+        );
+
+        uint256 feePlatformAmount = 0;
+
+        if (
+            isWhitelistedSender(sender) == false &&
+            isWhitelistedRecipient(recipient) == false &&
+            _feePlatformPct > 0 &&
+            _platformFeesAddress != address(0)
+        ) {
+            feePlatformAmount = amount.mul(_feePlatformPct).div(10000);
+
+            _balances[_platformFeesAddress] = _balances[_platformFeesAddress]
+                .add(feePlatformAmount);
+            emit Transfer(sender, _platformFeesAddress, feePlatformAmount);
+        }
+
+        amount = amount.sub(feePlatformAmount);
+
         _balances[recipient] = _balances[recipient].add(amount);
         emit Transfer(sender, recipient, amount);
     }
@@ -243,7 +333,10 @@ contract BEP20 is Context, IBEP20, Initializable {
     function _burn(address account, uint256 amount) internal {
         require(account != address(0), "BEP20: burn from the zero address");
 
-        _balances[account] = _balances[account].sub(amount, "BEP20: burn amount exceeds balance");
+        _balances[account] = _balances[account].sub(
+            amount,
+            "BEP20: burn amount exceeds balance"
+        );
         _totalSupply = _totalSupply.sub(amount);
         emit Transfer(account, address(0), amount);
     }
@@ -261,7 +354,11 @@ contract BEP20 is Context, IBEP20, Initializable {
      * - `owner` cannot be the zero address.
      * - `spender` cannot be the zero address.
      */
-    function _approve(address owner, address spender, uint256 amount) internal {
+    function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal {
         require(owner != address(0), "BEP20: approve from the zero address");
         require(spender != address(0), "BEP20: approve to the zero address");
 
@@ -277,6 +374,13 @@ contract BEP20 is Context, IBEP20, Initializable {
      */
     function _burnFrom(address account, uint256 amount) internal {
         _burn(account, amount);
-        _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance"));
+        _approve(
+            account,
+            _msgSender(),
+            _allowances[account][_msgSender()].sub(
+                amount,
+                "BEP20: burn amount exceeds allowance"
+            )
+        );
     }
 }

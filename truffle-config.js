@@ -19,7 +19,6 @@
  */
 
  const HDWalletProvider = require('@truffle/hdwallet-provider');
-const { privateKeysMain } = require('./privateKeys');
 
 
  
@@ -52,14 +51,6 @@ const { privateKeysMain } = require('./privateKeys');
        host: "127.0.0.1",     // Localhost (default: none)
        port: 8545,            // Standard Ethereum port (default: none)
        network_id: "*",       // Any network (default: none)
-       gasPrice: 10000000000
-     },
-     bsc: {
-       provider:  new HDWalletProvider(privateKeysMain
-         , "https://bsc-dataseed.binance.org/")
-       ,
-       network_id: 56,
-       gas: 4000000,      //make sure this gas allocation isn't over 4M, which is the max
        gasPrice: 10000000000
      }
      // Another network with more advanced options...
@@ -97,7 +88,7 @@ const { privateKeysMain } = require('./privateKeys');
    // Configure your compilers
    compilers: {
      solc: {
-       version: "0.6.2",    // Fetch exact version from solc-bin (default: truffle's version)
+       version: "0.8.2",    // Fetch exact version from solc-bin (default: truffle's version)
        // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
        settings: {          // See the solidity docs for advice about optimization and evmVersion
          optimizer: {
